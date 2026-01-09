@@ -43,11 +43,11 @@ public class MachineEvent {
     @Version
     private Long version;
 
-    // Hash of the event payload for deduplication
+    
     @Column(nullable = false)
     private String payloadHash;
 
-    // Constructors
+    
     public MachineEvent() {}
 
     public MachineEvent(String eventId, Instant eventTime, Instant receivedTime,
@@ -64,7 +64,7 @@ public class MachineEvent {
         this.payloadHash = payloadHash;
     }
 
-    // Getters and Setters
+    
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
