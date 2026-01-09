@@ -31,7 +31,7 @@ public class StatsResponse {
         this.status = status;
     }
 
-    // Getters and Setters
+    
     public String getMachineId() { return machineId; }
     public void setMachineId(String machineId) { this.machineId = machineId; }
 
