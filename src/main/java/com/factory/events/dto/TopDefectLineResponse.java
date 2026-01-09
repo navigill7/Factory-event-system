@@ -1,4 +1,3 @@
-// TopDefectLineResponse.java
 package com.factory.events.dto;
 
 public class TopDefectLineResponse {
@@ -19,8 +18,7 @@ public class TopDefectLineResponse {
                 ? Math.round((totalDefects * 10000.0) / eventCount) / 100.0
                 : 0.0;
     }
-
-    // Getters and Setters
+    
     public String getLineId() {
         return lineId;
     }
