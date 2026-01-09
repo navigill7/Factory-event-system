@@ -34,10 +34,9 @@ public class EventDTO {
     @JsonProperty("factoryId")
     private String factoryId;
     
-    // Constructors
+    
     public EventDTO() {}
     
-    // Getters and Setters
     public String getEventId() { return eventId; }
     public void setEventId(String eventId) { this.eventId = eventId; }
     
