@@ -15,6 +15,9 @@ public interface MachineEventRepository extends JpaRepository<MachineEvent, Long
 
     Optional<MachineEvent> findByEventId(String eventId);
 
+    
+    List<MachineEvent> findByEventIdIn(List<String> eventIds);
+
     @Query("SELECT COUNT(e) FROM MachineEvent e WHERE e.machineId = :machineId " +
             "AND e.eventTime >= :start AND e.eventTime < :end")
     long countEventsByMachineAndTimeRange(
