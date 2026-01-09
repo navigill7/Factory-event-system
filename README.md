@@ -28,7 +28,7 @@ The system follows a clean layered architecture. Here's how data flows through i
 
 Each layer has a single responsibility, which makes the code easier to test and maintain. The Controller doesn't know about database details, and the Repository doesn't care about business rules.
 
-#Architecture Design 
+##Architecture Design 
 
 <img width="1182" height="826" alt="image" src="https://github.com/user-attachments/assets/bf1147a6-f536-477d-aa51-c609940014a0" />
 
