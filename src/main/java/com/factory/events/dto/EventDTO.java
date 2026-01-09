@@ -62,10 +62,7 @@ public class EventDTO {
     public String getFactoryId() { return factoryId; }
     public void setFactoryId(String factoryId) { this.factoryId = factoryId; }
     
-    /**
-     * Generate a hash of the payload for deduplication.
-     * Excludes receivedTime as it's set by the service.
-     */
+ 
     public String generatePayloadHash() {
         try {
             String payload = String.format("%s|%s|%s|%d|%d|%s|%s",
