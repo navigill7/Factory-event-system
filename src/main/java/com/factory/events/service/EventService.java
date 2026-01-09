@@ -24,29 +24,29 @@ public class EventService {
         this.repository = repository;
     }
 
-    /**
-     * Batch ingest events with validation, deduplication, and update logic.
-     * Thread-safe through database transactions and optimistic locking.
-     */
     @Transactional
     public BatchIngestResponse ingestBatch(List<EventDTO> events) {
         BatchIngestResponse response = new BatchIngestResponse();
         Instant now = Instant.now();
 
-        // Collect all eventIds to check for existing records
+
         Set<String> eventIds = events.stream()
                 .map(EventDTO::getEventId)
                 .collect(Collectors.toSet());
 
-        // Fetch existing events in one query for performance
+        
         Map<String, MachineEvent> existingEvents = repository.findAll().stream()
                 .filter(e -> eventIds.contains(e.getEventId()))
                 .collect(Collectors.toMap(MachineEvent::getEventId, e -> e));
 
+    
+        Map<String, MachineEvent> batchSeen = new HashMap<>();
+
         List<MachineEvent> toSave = new ArrayList<>();
 
         for (EventDTO dto : events) {
-            // Validation
+
+            
             String validationError = validateEvent(dto, now);
             if (validationError != null) {
                 response.addRejection(dto.getEventId(), validationError);
@@ -54,38 +54,42 @@ public class EventService {
                 continue;
             }
 
-            // Set receivedTime to current time (ignore any value in request)
+            
             dto.setReceivedTime(now);
             String payloadHash = dto.generatePayloadHash();
 
             MachineEvent existing = existingEvents.get(dto.getEventId());
+            MachineEvent batchExisting = batchSeen.get(dto.getEventId());
 
-            if (existing == null) {
-                // New event - accept it
+            
+            if (existing == null && batchExisting == null) {
                 MachineEvent newEvent = createEventFromDTO(dto, payloadHash);
                 toSave.add(newEvent);
+                batchSeen.put(dto.getEventId(), newEvent);
                 response.setAccepted(response.getAccepted() + 1);
+                continue;
+            }
+
+            
+            MachineEvent target = (existing != null) ? existing : batchExisting;
+
+            
+            if (target.getPayloadHash().equals(payloadHash)) {
+                response.setDeduped(response.getDeduped() + 1);
+                continue;
+            }
+
+            
+            if (dto.getReceivedTime().isAfter(target.getReceivedTime())) {
+                updateEventFromDTO(target, dto, payloadHash);
+                toSave.add(target);
+                batchSeen.put(dto.getEventId(), target);
+                response.setUpdated(response.getUpdated() + 1);
             } else {
-                // Event with same ID exists - check for dedup or update
-                if (existing.getPayloadHash().equals(payloadHash)) {
-                    // Identical payload - deduplicate
-                    response.setDeduped(response.getDeduped() + 1);
-                } else {
-                    // Different payload - check receivedTime to decide update
-                    if (dto.getReceivedTime().isAfter(existing.getReceivedTime())) {
-                        // Newer receivedTime - update
-                        updateEventFromDTO(existing, dto, payloadHash);
-                        toSave.add(existing);
-                        response.setUpdated(response.getUpdated() + 1);
-                    } else {
-                        // Older receivedTime - ignore
-                        response.setDeduped(response.getDeduped() + 1);
-                    }
-                }
+                response.setDeduped(response.getDeduped() + 1);
             }
         }
 
-        // Batch save all new/updated events
         if (!toSave.isEmpty()) {
             repository.saveAll(toSave);
         }
@@ -93,12 +97,9 @@ public class EventService {
         return response;
     }
 
-    /**
-     * Validate event according to business rules.
-     * Returns null if valid, error message if invalid.
-     */
+   
     private String validateEvent(EventDTO dto, Instant now) {
-        // Check required fields
+
         if (dto.getEventId() == null || dto.getEventId().isEmpty()) {
             return "MISSING_EVENT_ID";
         }
@@ -115,12 +116,10 @@ public class EventService {
             return "MISSING_DEFECT_COUNT";
         }
 
-        // Validate duration
         if (dto.getDurationMs() < 0 || dto.getDurationMs() > MAX_DURATION_MS) {
             return "INVALID_DURATION";
         }
 
-        // Validate eventTime not too far in future
         Instant maxFutureTime = now.plus(Duration.ofMinutes(MAX_FUTURE_MINUTES));
         if (dto.getEventTime().isAfter(maxFutureTime)) {
             return "FUTURE_EVENT_TIME";
@@ -129,9 +128,7 @@ public class EventService {
         return null;
     }
 
-    /**
-     * Create new MachineEvent entity from DTO.
-     */
+ 
     private MachineEvent createEventFromDTO(EventDTO dto, String payloadHash) {
         return new MachineEvent(
                 dto.getEventId(),
@@ -146,9 +143,7 @@ public class EventService {
         );
     }
 
-    /**
-     * Update existing MachineEvent from DTO.
-     */
+
     private void updateEventFromDTO(MachineEvent event, EventDTO dto, String payloadHash) {
         event.setEventTime(dto.getEventTime());
         event.setReceivedTime(dto.getReceivedTime());
@@ -160,19 +155,14 @@ public class EventService {
         event.setPayloadHash(payloadHash);
     }
 
-    /**
-     * Get statistics for a machine in a time window.
-     */
+
     @Transactional(readOnly = true)
     public StatsResponse getStats(String machineId, Instant start, Instant end) {
         long eventsCount = repository.countEventsByMachineAndTimeRange(machineId, start, end);
         long defectsCount = repository.sumDefectsByMachineAndTimeRange(machineId, start, end);
 
-        // Calculate window duration in hours
-        double windowHours = Duration.between(start, end).getSeconds() / 3600.0;
-        double avgDefectRate = windowHours > 0 ? defectsCount / windowHours : 0.0;
-
-        // Round to 1 decimal place
+        double hours = Duration.between(start, end).getSeconds() / 3600.0;
+        double avgDefectRate = hours > 0 ? defectsCount / hours : 0.0;
         avgDefectRate = Math.round(avgDefectRate * 10.0) / 10.0;
 
         String status = avgDefectRate < HEALTHY_DEFECT_RATE_THRESHOLD ? "Healthy" : "Warning";
@@ -180,9 +170,7 @@ public class EventService {
         return new StatsResponse(machineId, start, end, eventsCount, defectsCount, avgDefectRate, status);
     }
 
-    /**
-     * Get top defect lines for a factory.
-     */
+
     @Transactional(readOnly = true)
     public List<TopDefectLineResponse> getTopDefectLines(String factoryId, Instant from, Instant to, int limit) {
         List<Object[]> results = repository.findTopDefectLines(factoryId, from, to);
@@ -190,9 +178,9 @@ public class EventService {
         return results.stream()
                 .limit(limit)
                 .map(row -> new TopDefectLineResponse(
-                        (String) row[0],      // lineId
-                        ((Number) row[1]).longValue(),  // totalDefects
-                        ((Number) row[2]).longValue()   // eventCount
+                        (String) row[0],
+                        ((Number) row[1]).longValue(),
+                        ((Number) row[2]).longValue()
                 ))
                 .collect(Collectors.toList());
     }
