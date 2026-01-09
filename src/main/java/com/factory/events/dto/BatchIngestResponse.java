@@ -31,7 +31,7 @@ public class BatchIngestResponse {
         public void setReason(String reason) { this.reason = reason; }
     }
 
-    // Getters and Setters
+    
     public int getAccepted() { return accepted; }
     public void setAccepted(int accepted) { this.accepted = accepted; }
 
