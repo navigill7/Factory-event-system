@@ -11,7 +11,6 @@ This is a backend service that processes events from factory machines. Think of 
 - PostgreSQL for production (H2 for testing)
 - Spring Data JPA for database access
 - Maven for build management
-
 ---
 
 ## How It's Architected
